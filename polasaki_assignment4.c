@@ -156,6 +156,7 @@ void redirect_input(char* inputFile){
         perror("Failure in dup2()");
         exit(EXIT_FAILURE);
     }
+    close(fileDescriptor);
 }
 
 // Redirects the standard output file to match the desired output file, creating a new one if it doesn't exist
@@ -170,6 +171,7 @@ void redirect_output(char* outputFile){
         perror("Failure in dup2()");
         exit(EXIT_FAILURE);
     }
+    close(fileDescriptor);
 }
 
 
@@ -193,23 +195,22 @@ int shell_command(struct command_line *currentCommand) {
 
         // Child 
         case 0:
+            // if no input/output files are listed in the command, redirect to /dev/null
+            char* inputFile = "/dev/null";
+            char* outputFile = "/dev/null";
+
             // If there was an input file, redirect stdin to be that file
             if (currentCommand->input_file) {
-                char* inputFile = currentCommand->input_file;
-                redirect_input(inputFile);
-            } else {
-                char* inputFile = "/dev/null";
-                redirect_input(inputFile);
+                inputFile = currentCommand->input_file;
             }
+            redirect_input(inputFile);
 
             // If there was an output file, redirect stdout to be that file
             if (currentCommand->output_file) {
-                char* outputFile = currentCommand->output_file;
-                redirect_output(outputFile);
-            } else {
-                char* outputFile = "/dev/null";
-                redirect_input(outputFile);
+                outputFile = currentCommand->output_file;
             }
+            redirect_output(outputFile);
+
 
             // Using execv, run the command
             if (execvp(currentCommand->argv[0], currentCommand->argv) == -1) {
