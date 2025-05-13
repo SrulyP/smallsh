@@ -247,8 +247,6 @@ int shell_command(struct command_line * currentCommand) {
     // Parent
     default:
         if (!currentCommand -> isBackground) {
-            printf("background pid is %d\n", pid);
-            fflush(stdout);
             pid_t pidStatus = waitpid(pid, & childStatus, 0);
             
             // Obtain the status of how the child ended:
@@ -261,6 +259,8 @@ int shell_command(struct command_line * currentCommand) {
                 foregroundProcessExitCode = WTERMSIG(childStatus);
             }
         } else {
+            printf("background pid is %d\n", pid);
+            fflush(stdout);
             bgProcesses[bgProcessesCounter] = pid;
             bgProcessesCounter++;
         }
