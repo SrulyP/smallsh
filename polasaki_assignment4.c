@@ -195,21 +195,37 @@ int shell_command(struct command_line *currentCommand) {
 
         // Child 
         case 0:
-            // if no input/output files are listed in the command, redirect to /dev/null
-            char* inputFile = "/dev/null";
-            char* outputFile = "/dev/null";
+            if (currentCommand->is_bg){
+                // if no input/output files are listed in the command and its a background process, redirect stdin/out to /dev/null
+                char* inputFile = "/dev/null";
+                char* outputFile = "/dev/null";
+                
+                // If there was an input file, redirect stdin to be that file
+                if (currentCommand->input_file) {
+                    inputFile = currentCommand->input_file;
+                }
+                redirect_input(inputFile);
 
-            // If there was an input file, redirect stdin to be that file
-            if (currentCommand->input_file) {
-                inputFile = currentCommand->input_file;
+                // If there was an output file, redirect stdout to be that file
+                if (currentCommand->output_file) {
+                    outputFile = currentCommand->output_file;
+                }
+                redirect_output(outputFile);
+            } else {
+                // If there was an input file and its a foreground process, redirect stdin to be that file
+                if (currentCommand->input_file) {
+                    char* inputFile = currentCommand->input_file;
+                    redirect_input(inputFile);
+                }
+                
+                // If there was an output file, redirect stdout to be that file
+                if (currentCommand->output_file) {
+                    char* outputFile = currentCommand->output_file;
+                    redirect_output(outputFile);
+                }
             }
-            redirect_input(inputFile);
-
-            // If there was an output file, redirect stdout to be that file
-            if (currentCommand->output_file) {
-                outputFile = currentCommand->output_file;
-            }
-            redirect_output(outputFile);
+            
+            
 
 
             // Using execv, run the command
