@@ -183,14 +183,15 @@ int shell_command(struct command_line *currentCommand) {
 
         // Failure in fork()
         case -1:
-            perror("fork failed!");
+            perror("Failure in fork()");
+            exit(EXIT_FAILURE);
             break;
 
         // Child 
         case 0:
             // Using execv, run the command
             if (execvp(currentCommand->argv[0], currentCommand->argv) == -1) {
-                perror("execvp failed!");
+                perror("Failure in execvp()");
                 exit(EXIT_FAILURE);
             }
             break;
