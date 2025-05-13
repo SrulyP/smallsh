@@ -2,9 +2,7 @@
 // Link: https://canvas.oregonstate.edu/courses/1999732/assignments/9997827?module_item_id=25329384
 // Date: 12 May 2025
 
-
 // -------------------------------------------- Preprocessor Directives and Structs -------------------------------------------- //
-
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -19,30 +17,33 @@
 
 #define INPUT_LENGTH 2048
 #define MAX_ARGS 512
+#define MAX_BACKGROUND_PROCESSES 50
 
 struct command_line {
     char * argv[MAX_ARGS + 1];
-    int  argc;
-    char * input_file;
-    char * output_file;
-    bool is_bg;
+    int argc;
+    char * inputFile;
+    char * outputFile;
+    bool isBackground;
 };
 
 
 // --------------------------------------------  Function Declarations and Global Variables -------------------------------------------- //
 
 
-void exit_program(struct command_line *currentCommand);
-void change_directory(struct command_line *currentCommand);
+void exit_program(struct command_line * currentCommand);
+void change_directory(struct command_line * currentCommand);
 void check_status();
-int  shell_command(struct command_line *currentCommand);
-void command_chooser(struct command_line *currentCommand);
-void redirect_input(char* inputFile);
-void redirect_output(char* outputFile);
-void redirect_foreground(struct command_line *currentCommand);
-void redirect_background(struct command_line *currentCommand);
+int shell_command(struct command_line * currentCommand);
+void command_chooser(struct command_line * currentCommand);
+void redirect_input(char * inputFile);
+void redirect_output(char * outputFile);
+void redirect_foreground(struct command_line * currentCommand);
+void redirect_background(struct command_line * currentCommand);
 
 int foregroundProcessExitCode = 0;
+int bgProcesses[MAX_BACKGROUND_PROCESSES];
+int bgProcessesCounter = 0;
 
 
 // -------------------------------------------- Parser - Adapted from Provided Code -------------------------------------------- //
@@ -51,7 +52,7 @@ int foregroundProcessExitCode = 0;
 struct command_line * parse_input() {
     char input[INPUT_LENGTH];
     struct command_line * currentCommand = (struct command_line * ) calloc(1,
-    sizeof(struct command_line));
+        sizeof(struct command_line));
     // Get input
     printf(": ");
     fflush(stdout);
@@ -67,13 +68,13 @@ struct command_line * parse_input() {
     // If it is not empty and not a comment, check for input/output files and if should run in background 
     while (token) {
         if (!strcmp(token, "<")) {
-        currentCommand -> input_file = strdup(strtok(NULL, " \n"));
+            currentCommand -> inputFile = strdup(strtok(NULL, " \n"));
         } else if (!strcmp(token, ">")) {
-        currentCommand -> output_file = strdup(strtok(NULL, " \n"));
+            currentCommand -> outputFile = strdup(strtok(NULL, " \n"));
         } else if (!strcmp(token, "&")) {
-        currentCommand -> is_bg = true;
+            currentCommand -> isBackground = true;
         } else {
-        currentCommand -> argv[currentCommand -> argc++] = strdup(token);
+            currentCommand -> argv[currentCommand -> argc++] = strdup(token);
         }
         token = strtok(NULL, " \n");
     }
@@ -97,15 +98,15 @@ int main() {
 // -------------------------------------------- Command chooser -------------------------------------------- //
 
 
-void command_chooser(struct command_line *currentCommand) {
-// find if current command is one of the 3 built-in commands, or if it is shell command
-    if (strcmp(currentCommand->argv[0], "exit") == 0) {
+void command_chooser(struct command_line * currentCommand) {
+    // find if current command is one of the 3 built-in commands, or if it is shell command
+    if (strcmp(currentCommand -> argv[0], "exit") == 0) {
         exit_program(currentCommand);
 
-    } else if (strcmp(currentCommand->argv[0], "cd") == 0) {
+    } else if (strcmp(currentCommand -> argv[0], "cd") == 0) {
         change_directory(currentCommand);
 
-    } else if (strcmp(currentCommand->argv[0], "status") == 0) {
+    } else if (strcmp(currentCommand -> argv[0], "status") == 0) {
         check_status();
 
     } else {
@@ -117,23 +118,23 @@ void command_chooser(struct command_line *currentCommand) {
 // -------------------------------------------- Built-in Commands -------------------------------------------- //
 
 
-void exit_program(struct command_line *currentCommand) {
+void exit_program(struct command_line * currentCommand) {
     // Kill any other processes or jobs that your shell has started before it terminates itself
     exit(EXIT_SUCCESS);
 }
 
-void change_directory(struct command_line *currentCommand) {
+void change_directory(struct command_line * currentCommand) {
     // If no location is provided, go to HOME path.
-    if (currentCommand->argc < 2) {
-        char* homePath = getenv("HOME");
+    if (currentCommand -> argc < 2) {
+        char * homePath = getenv("HOME");
         chdir(homePath);
     // Else, go to provided path
     } else {
-        char* path = currentCommand->argv[1];
-        if (chdir(path) == -1) { 
+        char * path = currentCommand -> argv[1];
+        if (chdir(path) == -1) {
             printf("cd: %s: No such file or directory\n", path);
             fflush(stdout);
-        } 
+        }
     }
 }
 
@@ -141,14 +142,14 @@ void check_status() {
     // prints out either the exit status or the terminating signal of the last foreground process ran by shell.
     printf("exit value %d", foregroundProcessExitCode);
     fflush(stdout);
-    } 
+}
 
 
 // -------------------------------------------- Redirection of input and output -------------------------------------------- //
 
 
 // Redirects the standard input file to match the desired input file
-void redirect_input(char* inputFile){
+void redirect_input(char * inputFile) {
     int fileDescriptor = open(inputFile, O_RDONLY);
     if (fileDescriptor == -1) {
         perror("Failure in open()");
@@ -162,9 +163,8 @@ void redirect_input(char* inputFile){
     close(fileDescriptor);
 }
 
-
 // Redirects the standard output file to match the desired output file, creating a new one if it doesn't exist
-void redirect_output(char* outputFile){
+void redirect_output(char * outputFile) {
     int fileDescriptor = open(outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0640);
     if (fileDescriptor == -1) {
         perror("Failure in open()");
@@ -178,36 +178,34 @@ void redirect_output(char* outputFile){
     close(fileDescriptor);
 }
 
-
-void redirect_background(struct command_line *currentCommand) {
+void redirect_background(struct command_line * currentCommand) {
     // if no input/output files are listed in the command and its a background process, redirect stdin/out to /dev/null
-    char* inputFile = "/dev/null";
-    char* outputFile = "/dev/null";
+    char * inputFile = "/dev/null";
+    char * outputFile = "/dev/null";
 
     // If there was an input file, redirect stdin to be that file
-    if (currentCommand->input_file) {
-        inputFile = currentCommand->input_file;
+    if (currentCommand -> inputFile) {
+        inputFile = currentCommand -> inputFile;
     }
     redirect_input(inputFile);
 
     // If there was an output file, redirect stdout to be that file
-    if (currentCommand->output_file) {
-        outputFile = currentCommand->output_file;
+    if (currentCommand -> outputFile) {
+        outputFile = currentCommand -> outputFile;
     }
     redirect_output(outputFile);
 }
 
-
-void redirect_foreground(struct command_line *currentCommand) {
+void redirect_foreground(struct command_line * currentCommand) {
     // If there was an input file and its a foreground process, redirect stdin to be that file
-    if (currentCommand->input_file) {
-        char* inputFile = currentCommand->input_file;
+    if (currentCommand -> inputFile) {
+        char * inputFile = currentCommand -> inputFile;
         redirect_input(inputFile);
     }
 
     // If there was an output file, redirect stdout to be that file
-    if (currentCommand->output_file) {
-        char* outputFile = currentCommand->output_file;
+    if (currentCommand -> outputFile) {
+        char * outputFile = currentCommand -> outputFile;
         redirect_output(outputFile);
     }
 }
@@ -216,55 +214,58 @@ void redirect_foreground(struct command_line *currentCommand) {
 // -------------------------------------------- Shell Commands -------------------------------------------- //
 
 
-int shell_command(struct command_line *currentCommand) {
-    if (currentCommand->is_bg){
-        // create list of PIDs in background that are not completed.
-        // check their status using waitpid(...WNOHANG...) before returning access
-        // of shell to the user
-
-    }
-    
+int shell_command(struct command_line * currentCommand) {
     pid_t pid = fork();
     int childStatus;
-    switch (pid){
+    switch (pid) {
 
-        // Failure in fork()
-        case -1:
-            perror("Failure in fork()");
+    // Failure in fork()
+    case -1:
+        perror("Failure in fork()");
+        exit(EXIT_FAILURE);
+        break;
+
+    // Child 
+    case 0:
+        if (currentCommand -> isBackground) {
+            redirect_background(currentCommand);
+            // create list of PIDs in background that are not completed.
+            // check their status using waitpid(...WNOHANG...) before returning access
+            // of shell to the user
+
+        } else {
+            redirect_foreground(currentCommand);
+        }
+
+        // Using execv, run the command
+        if (execvp(currentCommand -> argv[0], currentCommand -> argv) == -1) {
+            perror("Failure in execvp()");
             exit(EXIT_FAILURE);
-            break;
+        }
+        break;
 
-        // Child 
-        case 0:
-            if (currentCommand->is_bg){
-                redirect_background(currentCommand);
-            } else {
-                redirect_foreground(currentCommand);
-            }
-
-            // Using execv, run the command
-            if (execvp(currentCommand->argv[0], currentCommand->argv) == -1) {
-                perror("Failure in execvp()");
-                exit(EXIT_FAILURE);
-            }
-            break;
+    // Parent
+    default:
+        if (!currentCommand -> isBackground) {
+            printf("background pid is %d\n", pid);
+            fflush(stdout);
+            pid_t pidStatus = waitpid(pid, & childStatus, 0);
             
-        // Parent
-        default:
-            pid_t pidStatus = waitpid(pid, &childStatus, 0);
-            // Obtain the status of how the child ended
-            // If it was a normal termination, what was the term. code?
+            // Obtain the status of how the child ended:
+            // If it was a normal termination, what was the termination code?
             if (WIFEXITED(childStatus)) {
                 int status = WEXITSTATUS(childStatus);
                 foregroundProcessExitCode = status;
-            // If it was an abnormal termination, what was the term. code?
+            // If it was an abnormal termination, what was the termination code?
             } else if (WIFSIGNALED(childStatus)) {
                 foregroundProcessExitCode = WTERMSIG(childStatus);
             }
-            break;
+        } else {
+            bgProcesses[bgProcessesCounter] = pid;
+            bgProcessesCounter++;
+        }
+        break;
     }
 
-    return 0;
+    return EXIT_SUCCESS;
 }
-
-
