@@ -37,6 +37,8 @@ void change_directory(struct command_line *currentCommand);
 void check_status();
 int  shell_command(struct command_line *currentCommand);
 void command_chooser(struct command_line *currentCommand);
+void redirect_input(char* inputFile);
+void redirect_output(char* outputFile);
 
 int foregroundProcessExitCode = 0;
 
@@ -129,9 +131,7 @@ void change_directory(struct command_line *currentCommand) {
         if (chdir(path) == -1) { 
             printf("cd: %s: No such file or directory\n", path);
             fflush(stdout);
-        } else { 
-            chdir(path);
-        }
+        } 
     }
 }
 
@@ -144,37 +144,35 @@ void check_status() {
 // -------------------------------------------- Shell Commands -------------------------------------------- //
 
 
+void redirect_input(char* inputFile){
+    int fileDescriptor = open(inputFile, O_RDONLY);
+    if (fileDescriptor == -1) {
+        perror("Failure in open()");
+        exit(EXIT_FAILURE);
+    }
+    int redirection = dup2(fileDescriptor, 0);
+    if (redirection == -1) {
+        perror("Failure in dup2()");
+        exit(EXIT_FAILURE);
+    }
+}
+
+void redirect_output(char* outputFile){
+    int fileDescriptor = open(outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0640);
+    if (fileDescriptor == -1) {
+        perror("Failure in open()");
+        exit(EXIT_FAILURE);
+    }
+    int redirection = dup2(fileDescriptor, 1);
+    if (redirection == -1) {
+        perror("Failure in dup2()");
+        exit(EXIT_FAILURE);
+    }
+}
+
 int shell_command(struct command_line *currentCommand) {
     if (currentCommand->is_bg) {
         // Make list to keep track of background functions
-    }
-
-    // If there was an input file, redirect stdin to be that file
-    if (currentCommand->input_file) {
-        int fileDescriptor = open(currentCommand->input_file, O_RDONLY);
-        if (fileDescriptor == -1) {
-            perror("Failure in open()");
-            exit(EXIT_FAILURE);
-        }
-        int redirection = dup2(fileDescriptor, 0);
-        if (redirection == -1) {
-            perror("Failure in dup2()");
-            exit(EXIT_FAILURE);
-        }
-    }
-
-    // If there was an output file, redirect stdout to be that file
-    if (currentCommand->output_file) {
-        int fileDescriptor = open(currentCommand->output_file, O_WRONLY | O_CREAT | O_TRUNC, 0640);
-        if (fileDescriptor == -1) {
-            perror("Failure in open()");
-            exit(EXIT_FAILURE);
-        }
-        int redirection = dup2(fileDescriptor, 1);
-        if (redirection == -1) {
-            perror("Failure in dup2()");
-            exit(EXIT_FAILURE);
-        }
     }
 
     pid_t pid = fork();
@@ -189,6 +187,18 @@ int shell_command(struct command_line *currentCommand) {
 
         // Child 
         case 0:
+            // If there was an input file, redirect stdin to be that file
+            if (currentCommand->input_file) {
+                char* inputFile = currentCommand->input_file;
+                redirect_input(inputFile);
+            }
+
+            // If there was an output file, redirect stdout to be that file
+            if (currentCommand->output_file) {
+                char* outputFile = currentCommand->output_file;
+                redirect_output(outputFile);
+            }
+
             // Using execv, run the command
             if (execvp(currentCommand->argv[0], currentCommand->argv) == -1) {
                 perror("Failure in execvp()");
@@ -210,7 +220,7 @@ int shell_command(struct command_line *currentCommand) {
             }
             break;
     }
-    
+
     return 0;
 }
 
