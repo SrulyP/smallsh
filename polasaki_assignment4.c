@@ -144,6 +144,7 @@ void check_status() {
 // -------------------------------------------- Shell Commands -------------------------------------------- //
 
 
+// Redirects the standard input file to match the desired input file
 void redirect_input(char* inputFile){
     int fileDescriptor = open(inputFile, O_RDONLY);
     if (fileDescriptor == -1) {
@@ -157,6 +158,7 @@ void redirect_input(char* inputFile){
     }
 }
 
+// Redirects the standard output file to match the desired output file, creating a new one if it doesn't exist
 void redirect_output(char* outputFile){
     int fileDescriptor = open(outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0640);
     if (fileDescriptor == -1) {
