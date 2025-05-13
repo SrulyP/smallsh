@@ -39,6 +39,8 @@ int  shell_command(struct command_line *currentCommand);
 void command_chooser(struct command_line *currentCommand);
 void redirect_input(char* inputFile);
 void redirect_output(char* outputFile);
+void redirect_foreground(struct command_line *currentCommand);
+void redirect_background(struct command_line *currentCommand);
 
 int foregroundProcessExitCode = 0;
 
@@ -138,10 +140,11 @@ void change_directory(struct command_line *currentCommand) {
 void check_status() {
     // prints out either the exit status or the terminating signal of the last foreground process ran by shell.
     printf("exit value %d", foregroundProcessExitCode);
+    fflush(stdout);
     } 
 
 
-// -------------------------------------------- Shell Commands -------------------------------------------- //
+// -------------------------------------------- Redirection of input and output -------------------------------------------- //
 
 
 // Redirects the standard input file to match the desired input file
@@ -159,6 +162,7 @@ void redirect_input(char* inputFile){
     close(fileDescriptor);
 }
 
+
 // Redirects the standard output file to match the desired output file, creating a new one if it doesn't exist
 void redirect_output(char* outputFile){
     int fileDescriptor = open(outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0640);
@@ -173,6 +177,43 @@ void redirect_output(char* outputFile){
     }
     close(fileDescriptor);
 }
+
+
+void redirect_background(struct command_line *currentCommand) {
+    // if no input/output files are listed in the command and its a background process, redirect stdin/out to /dev/null
+    char* inputFile = "/dev/null";
+    char* outputFile = "/dev/null";
+
+    // If there was an input file, redirect stdin to be that file
+    if (currentCommand->input_file) {
+        inputFile = currentCommand->input_file;
+    }
+    redirect_input(inputFile);
+
+    // If there was an output file, redirect stdout to be that file
+    if (currentCommand->output_file) {
+        outputFile = currentCommand->output_file;
+    }
+    redirect_output(outputFile);
+}
+
+
+void redirect_foreground(struct command_line *currentCommand) {
+    // If there was an input file and its a foreground process, redirect stdin to be that file
+    if (currentCommand->input_file) {
+        char* inputFile = currentCommand->input_file;
+        redirect_input(inputFile);
+    }
+
+    // If there was an output file, redirect stdout to be that file
+    if (currentCommand->output_file) {
+        char* outputFile = currentCommand->output_file;
+        redirect_output(outputFile);
+    }
+}
+
+
+// -------------------------------------------- Shell Commands -------------------------------------------- //
 
 
 int shell_command(struct command_line *currentCommand) {
@@ -196,37 +237,10 @@ int shell_command(struct command_line *currentCommand) {
         // Child 
         case 0:
             if (currentCommand->is_bg){
-                // if no input/output files are listed in the command and its a background process, redirect stdin/out to /dev/null
-                char* inputFile = "/dev/null";
-                char* outputFile = "/dev/null";
-                
-                // If there was an input file, redirect stdin to be that file
-                if (currentCommand->input_file) {
-                    inputFile = currentCommand->input_file;
-                }
-                redirect_input(inputFile);
-
-                // If there was an output file, redirect stdout to be that file
-                if (currentCommand->output_file) {
-                    outputFile = currentCommand->output_file;
-                }
-                redirect_output(outputFile);
+                redirect_background(currentCommand);
             } else {
-                // If there was an input file and its a foreground process, redirect stdin to be that file
-                if (currentCommand->input_file) {
-                    char* inputFile = currentCommand->input_file;
-                    redirect_input(inputFile);
-                }
-                
-                // If there was an output file, redirect stdout to be that file
-                if (currentCommand->output_file) {
-                    char* outputFile = currentCommand->output_file;
-                    redirect_output(outputFile);
-                }
+                redirect_foreground(currentCommand);
             }
-            
-            
-
 
             // Using execv, run the command
             if (execvp(currentCommand->argv[0], currentCommand->argv) == -1) {
