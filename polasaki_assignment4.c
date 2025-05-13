@@ -172,11 +172,15 @@ void redirect_output(char* outputFile){
     }
 }
 
-int shell_command(struct command_line *currentCommand) {
-    if (currentCommand->is_bg) {
-        // Make list to keep track of background functions
-    }
 
+int shell_command(struct command_line *currentCommand) {
+    if (currentCommand->is_bg){
+        // create list of PIDs in background that are not completed.
+        // check their status using waitpid(...WNOHANG...) before returning access
+        // of shell to the user
+
+    }
+    
     pid_t pid = fork();
     int childStatus;
     switch (pid){
@@ -193,12 +197,18 @@ int shell_command(struct command_line *currentCommand) {
             if (currentCommand->input_file) {
                 char* inputFile = currentCommand->input_file;
                 redirect_input(inputFile);
+            } else {
+                char* inputFile = "/dev/null";
+                redirect_input(inputFile);
             }
 
             // If there was an output file, redirect stdout to be that file
             if (currentCommand->output_file) {
                 char* outputFile = currentCommand->output_file;
                 redirect_output(outputFile);
+            } else {
+                char* outputFile = "/dev/null";
+                redirect_input(outputFile);
             }
 
             // Using execv, run the command
