@@ -33,7 +33,7 @@ struct command_line {
 
 void exit_program(struct command_line * currentCommand);
 void change_directory(struct command_line * currentCommand);
-void check_status();
+void check_status(void);
 int shell_command(struct command_line * currentCommand);
 void command_chooser(struct command_line * currentCommand);
 void redirect_input(char * inputFile);
@@ -59,12 +59,6 @@ struct command_line * parse_input() {
     fgets(input, INPUT_LENGTH, stdin);
     // Tokenize the input
     char * token = strtok(input, " \n");
-    // Check if the command is a comment or if it is empty
-    if (token && (token[0] == '#')) {
-        return currentCommand;
-    } else if (!token) {
-        return currentCommand;
-    }
     // If it is not empty and not a comment, check for input/output files and if should run in background 
     while (token) {
         if (!strcmp(token, "<")) {
@@ -89,7 +83,11 @@ int main() {
     struct command_line * currentCommand;
     while (true) {
         currentCommand = parse_input();
-        command_chooser(currentCommand);
+        // If command is not empty and not a comment, run it
+        if ((currentCommand->argc > 0) && (currentCommand->argv[0][0] != '#')) {
+            command_chooser(currentCommand);
+            }
+       
     }
     return EXIT_SUCCESS;
 }
@@ -120,6 +118,7 @@ void command_chooser(struct command_line * currentCommand) {
 
 void exit_program(struct command_line * currentCommand) {
     // Kill any other processes or jobs that your shell has started before it terminates itself
+    // iterate through bg processes and kill them
     exit(EXIT_SUCCESS);
 }
 
@@ -132,15 +131,15 @@ void change_directory(struct command_line * currentCommand) {
     } else {
         char * path = currentCommand -> argv[1];
         if (chdir(path) == -1) {
-            printf("cd: %s: No such file or directory\n", path);
+            printf("%s: No such file or directory\n", path);
             fflush(stdout);
         }
     }
 }
 
-void check_status() {
+void check_status(void) {
     // prints out either the exit status or the terminating signal of the last foreground process ran by shell.
-    printf("exit value %d", foregroundProcessExitCode);
+    printf("exit value %d\n", foregroundProcessExitCode);
     fflush(stdout);
 }
 
@@ -152,12 +151,13 @@ void check_status() {
 void redirect_input(char * inputFile) {
     int fileDescriptor = open(inputFile, O_RDONLY);
     if (fileDescriptor == -1) {
-        perror("Failure in open()");
+        printf("cannot open %s for input\n", inputFile);
+        fflush(stdout);
         exit(EXIT_FAILURE);
     }
     int redirection = dup2(fileDescriptor, 0);
     if (redirection == -1) {
-        perror("Failure in dup2()");
+        perror("dup2()");
         exit(EXIT_FAILURE);
     }
     close(fileDescriptor);
@@ -167,12 +167,13 @@ void redirect_input(char * inputFile) {
 void redirect_output(char * outputFile) {
     int fileDescriptor = open(outputFile, O_WRONLY | O_CREAT | O_TRUNC, 0640);
     if (fileDescriptor == -1) {
-        perror("Failure in open()");
+        printf("cannot open %s for output\n", outputFile);
+        fflush(stdout);
         exit(EXIT_FAILURE);
     }
     int redirection = dup2(fileDescriptor, 1);
     if (redirection == -1) {
-        perror("Failure in dup2()");
+        perror("dup2()");
         exit(EXIT_FAILURE);
     }
     close(fileDescriptor);
@@ -221,7 +222,7 @@ int shell_command(struct command_line * currentCommand) {
 
     // Failure in fork()
     case -1:
-        perror("Failure in fork()");
+        perror("fork()");
         exit(EXIT_FAILURE);
         break;
 
@@ -239,7 +240,8 @@ int shell_command(struct command_line * currentCommand) {
 
         // Using execv, run the command
         if (execvp(currentCommand -> argv[0], currentCommand -> argv) == -1) {
-            perror("Failure in execvp()");
+            printf("%s: no such file or directory\n", currentCommand->argv[0]);
+            fflush(stdout);
             exit(EXIT_FAILURE);
         }
         break;
