@@ -20,10 +20,10 @@
 #define MAX_BACKGROUND_PROCESSES 50
 
 struct command_line {
-    char * argv[MAX_ARGS + 1];
+    char* argv[MAX_ARGS + 1];
     int argc;
-    char * inputFile;
-    char * outputFile;
+    char* inputFile;
+    char* outputFile;
     bool isBackground;
 };
 
@@ -31,15 +31,15 @@ struct command_line {
 // --------------------------------------------  Function Declarations and Global Variables -------------------------------------------- //
 
 
+void command_chooser(struct command_line * currentCommand);
 void exit_program(struct command_line * currentCommand);
 void change_directory(struct command_line * currentCommand);
 void check_status(void);
-int shell_command(struct command_line * currentCommand);
-void command_chooser(struct command_line * currentCommand);
-void redirect_input(char * inputFile);
-void redirect_output(char * outputFile);
-void redirect_foreground(struct command_line * currentCommand);
+void redirect_input(char* inputFile);
+void redirect_output(char* outputFile);
 void redirect_background(struct command_line * currentCommand);
+void redirect_foreground(struct command_line * currentCommand);
+int  shell_command(struct command_line * currentCommand);
 void check_background_processes(void);
 
 int foregroundProcessExitCode = 0;
