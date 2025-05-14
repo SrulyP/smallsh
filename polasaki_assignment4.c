@@ -40,6 +40,7 @@ void redirect_input(char * inputFile);
 void redirect_output(char * outputFile);
 void redirect_foreground(struct command_line * currentCommand);
 void redirect_background(struct command_line * currentCommand);
+void check_background_processes(void);
 
 int foregroundProcessExitCode = 0;
 int bgProcesses[MAX_BACKGROUND_PROCESSES];
@@ -87,7 +88,7 @@ int main() {
         if ((currentCommand->argc > 0) && (currentCommand->argv[0][0] != '#')) {
             command_chooser(currentCommand);
             }
-       
+        check_background_processes();
     }
     return EXIT_SUCCESS;
 }
@@ -131,7 +132,7 @@ void change_directory(struct command_line * currentCommand) {
     } else {
         char * path = currentCommand -> argv[1];
         if (chdir(path) == -1) {
-            printf("%s: No such file or directory\n", path);
+            printf("%s: no such file or directory\n", path);
             fflush(stdout);
         }
     }
@@ -230,10 +231,6 @@ int shell_command(struct command_line * currentCommand) {
     case 0:
         if (currentCommand -> isBackground) {
             redirect_background(currentCommand);
-            // create list of PIDs in background that are not completed.
-            // check their status using waitpid(...WNOHANG...) before returning access
-            // of shell to the user
-
         } else {
             redirect_foreground(currentCommand);
         }
@@ -249,7 +246,7 @@ int shell_command(struct command_line * currentCommand) {
     // Parent
     default:
         if (!currentCommand -> isBackground) {
-            pid_t pidStatus = waitpid(pid, & childStatus, 0);
+            pid_t pidStatus = waitpid(pid, &childStatus, 0);
             
             // Obtain the status of how the child ended:
             // If it was a normal termination, what was the termination code?
@@ -265,9 +262,39 @@ int shell_command(struct command_line * currentCommand) {
             fflush(stdout);
             bgProcesses[bgProcessesCounter] = pid;
             bgProcessesCounter++;
+            check_background_processes();
         }
         break;
     }
 
     return EXIT_SUCCESS;
+}
+
+void check_background_processes(void) {
+    int status;
+    for (int i = 0; i < bgProcessesCounter; i++) {
+        pid_t bgPid = bgProcesses[i];
+        pid_t currentStatus = waitpid(bgPid, &status, WNOHANG);
+
+        // If the current background process is still running, move on to the next
+        if (currentStatus == 0) {
+            continue;
+        } else if (currentStatus == -1) {
+            // If there is an error, or if the process was already reaped
+            bgProcesses[i] = bgProcesses[--bgProcessesCounter];
+            i--; 
+        } else {
+            // If the current background process has ended, print the PID and the exit value/signal
+            if (WIFEXITED(status)) {
+                printf("background pid %d is done: exit value %d\n", bgPid, WEXITSTATUS(status));
+            } else if (WIFSIGNALED(status)) {
+                printf("background pid %d is done: terminated by signal %d\n", bgPid, WTERMSIG(status));
+            }
+            fflush(stdout);
+
+            // Remove this PID from the array and check the one that replaced its position
+            bgProcesses[i] = bgProcesses[--bgProcessesCounter];
+            i--;
+        }
+    }
 }
