@@ -246,19 +246,24 @@ int shell_command(struct command_line * currentCommand) {
 
     // Child 
     case 0:
+        // Children ignore SIGTSTP (Ctrl - Z) so only the shell handles it
+        struct sigaction ignore_TSTP = {0};
+        ignore_TSTP.sa_handler = SIG_IGN;
+        sigaction(SIGTSTP, &ignore_TSTP, NULL);
+
         if (currentCommand->isBackground) {
-            // If command is run in background, ignore SIGINT (ctrl - z)
+            // If child is run in background, ignore SIGINT (ctrl - C)
             struct sigaction ignore_action = {0}; 
             ignore_action.sa_handler = SIG_IGN;
             sigaction(SIGINT, &ignore_action, NULL);
             redirect_background(currentCommand);
         } else {
-        // If command is run in foreground, run SIGINT (ctrl - z)
+        // If child is run in foreground, run SIGINT (ctrl - C)
             struct sigaction default_action = {0};
             default_action.sa_handler = SIG_DFL;  
             sigaction(SIGINT, &default_action, NULL); 
             redirect_foreground(currentCommand);
-    }
+        }
 
         // Using execv, run the command
         if (execvp(currentCommand -> argv[0], currentCommand -> argv) == -1) {
