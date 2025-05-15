@@ -47,6 +47,7 @@ void handle_SIGTSTP(int signal);
 int foregroundProcessExitCode = 0;
 int bgProcesses[MAX_BACKGROUND_PROCESSES];
 int bgProcessesCounter = 0;
+int onlyForeground = 0;
 
 
 // -------------------------------------------- Parser - Adapted from Provided Code -------------------------------------------- //
@@ -69,7 +70,12 @@ struct command_line * parse_input() {
         } else if (!strcmp(token, ">")) {
             currentCommand -> outputFile = strdup(strtok(NULL, " \n"));
         } else if (!strcmp(token, "&")) {
-            currentCommand -> isBackground = true;
+            if (onlyForeground == 1) {
+                currentCommand -> isBackground = false;
+            } else {
+                currentCommand -> isBackground = true;
+            }
+            
         } else {
             currentCommand -> argv[currentCommand -> argc++] = strdup(token);
         }
@@ -83,13 +89,11 @@ struct command_line * parse_input() {
 
 
 int main() {
-    // handle SIGINT (ctrl - C)
-    struct sigaction SIGINT_action = {0};
-    SIGINT_action.sa_handler = SIG_IGN;
-    sigfillset(&SIGINT_action.sa_mask);
-    SIGINT_action.sa_flags = 0;
-    sigaction(SIGINT, &SIGINT_action, NULL);
 
+    // handle SIGINT (ctrl - C) - parent ignores it
+    struct sigaction ignore_SIGINT = {0};
+    ignore_SIGINT.sa_handler = SIG_IGN;
+    sigaction(SIGINT, &ignore_SIGINT, NULL);
 
     // handle SIGTSTP (ctrl - Z)
     struct sigaction SIGTSTP_action = {0};
@@ -253,12 +257,12 @@ int shell_command(struct command_line * currentCommand) {
 
         if (currentCommand->isBackground) {
             // If child is run in background, ignore SIGINT (ctrl - C)
-            struct sigaction ignore_action = {0}; 
-            ignore_action.sa_handler = SIG_IGN;
-            sigaction(SIGINT, &ignore_action, NULL);
+            struct sigaction ignore_SIGINT = {0}; 
+            ignore_SIGINT.sa_handler = SIG_IGN;
+            sigaction(SIGINT, &ignore_SIGINT, NULL);
             redirect_background(currentCommand);
         } else {
-        // If child is run in foreground, run SIGINT (ctrl - C)
+            // If child is run in foreground, run SIGINT (ctrl - C)
             struct sigaction default_action = {0};
             default_action.sa_handler = SIG_DFL;  
             sigaction(SIGINT, &default_action, NULL); 
@@ -332,5 +336,19 @@ void check_background_processes(void) {
 }
 
 void handle_SIGTSTP(int signal) {
-
+    // handle SIGTSTP for parent process
+    switch (onlyForeground){
+        case 0:
+            printf("Entering foreground-only mode (& is now ignored)\n");
+            fflush(stdout);
+            onlyForeground = 1;
+            break;
+        case 1:
+            printf("Exiting foreground-only mode\n");
+            fflush(stdout);
+            onlyForeground = 0;
+            break;
+        default:
+            break;
+    }
 }
