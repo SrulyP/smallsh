@@ -41,6 +41,9 @@ void redirect_background(struct command_line * currentCommand);
 void redirect_foreground(struct command_line * currentCommand);
 int  shell_command(struct command_line * currentCommand);
 void check_background_processes(void);
+void handle_SIGINT(int signal);
+void handle_SIGTSTP(int signal);
+
 
 int foregroundProcessExitCode = 0;
 int bgProcesses[MAX_BACKGROUND_PROCESSES];
@@ -81,6 +84,21 @@ struct command_line * parse_input() {
 
 
 int main() {
+    // handle SIGINT (ctrl - C)
+    struct sigaction SIGINT_action = {0};
+    SIGINT_action.sa_handler = SIG_IGN;
+    sigfillset(&SIGINT_action.sa_mask);
+    SIGINT_action.sa_flags = 0;
+    sigaction(SIGINT, &SIGINT_action, NULL);
+
+
+    // handle SIGTSTP (ctrl - Z)
+    struct sigaction SIGTSTP_action = {0};
+    SIGTSTP_action.sa_handler = &handle_SIGTSTP;
+    sigfillset(&SIGTSTP_action.sa_mask);
+    SIGTSTP_action.sa_flags = SA_RESTART;
+    sigaction(SIGTSTP, &SIGTSTP_action, NULL);
+
     struct command_line * currentCommand;
     while (true) {
         currentCommand = parse_input();
@@ -229,11 +247,19 @@ int shell_command(struct command_line * currentCommand) {
 
     // Child 
     case 0:
-        if (currentCommand -> isBackground) {
+        if (currentCommand->isBackground) {
+            // If command is run in background, ignore SIGINT (ctrl - z)
+            struct sigaction ignore_action = {0}; 
+            ignore_action.sa_handler = SIG_IGN;
+            sigaction(SIGINT, &ignore_action, NULL);
             redirect_background(currentCommand);
         } else {
+        // If command is run in foreground, run SIGINT (ctrl - z)
+            struct sigaction default_action = {0};
+            default_action.sa_handler = SIG_DFL;  
+            sigaction(SIGINT, &default_action, NULL); 
             redirect_foreground(currentCommand);
-        }
+    }
 
         // Using execv, run the command
         if (execvp(currentCommand -> argv[0], currentCommand -> argv) == -1) {
@@ -256,6 +282,8 @@ int shell_command(struct command_line * currentCommand) {
             // If it was an abnormal termination, what was the termination code?
             } else if (WIFSIGNALED(childStatus)) {
                 foregroundProcessExitCode = WTERMSIG(childStatus);
+                printf("terminated by signal %d\n", foregroundProcessExitCode);
+                fflush(stdout);
             }
         } else {
             printf("background pid is %d\n", pid);
@@ -297,4 +325,13 @@ void check_background_processes(void) {
             i--;
         }
     }
+}
+
+
+void handle_SIGINT(int signal){
+    kill(getpid(), SIGINT);
+}
+
+void handle_SIGTSTP(int signal){
+    kill(getpid(), SIGTSTP);
 }
