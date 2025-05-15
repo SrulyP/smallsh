@@ -41,7 +41,6 @@ void redirect_background(struct command_line * currentCommand);
 void redirect_foreground(struct command_line * currentCommand);
 int  shell_command(struct command_line * currentCommand);
 void check_background_processes(void);
-void handle_SIGINT(int signal);
 void handle_SIGTSTP(int signal);
 
 
@@ -327,11 +326,6 @@ void check_background_processes(void) {
     }
 }
 
+void handle_SIGTSTP(int signal) {
 
-void handle_SIGINT(int signal){
-    kill(getpid(), SIGINT);
-}
-
-void handle_SIGTSTP(int signal){
-    kill(getpid(), SIGTSTP);
 }
