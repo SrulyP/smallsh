@@ -1,6 +1,17 @@
-// Function: Code for parser adapted from code provided in exploration:
+// Author: Israel Polasak
+// GitHub username: SrulyP
+// Date: 15 May 2025
+// Description: Smallsh is a custom UNIX-based shell that supports built-in commands (cd, status, exit), 
+// execution of external commands via the environment path and the exec family, foreground/background process management, 
+// input/output redirection, and a foreground-only mode toggled by SIGTSTP (Ctrl - Z). It also implements custom signal handling 
+// for SIGINT and SIGTSTP to manage process modes.
+
+
+// Credits:
+// Code for parser adapted from code provided in exploration:
 // Link: https://canvas.oregonstate.edu/courses/1999732/assignments/9997827?module_item_id=25329384
 // Date: 12 May 2025
+
 
 // -------------------------------------------- Preprocessor Directives and Structs -------------------------------------------- //
 
