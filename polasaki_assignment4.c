@@ -6,7 +6,6 @@
 // input/output redirection, and a foreground-only mode toggled by SIGTSTP (Ctrl - Z). It also implements custom signal handling 
 // for SIGINT and SIGTSTP to manage process modes.
 
-
 // Credits:
 // Code for parser adapted from code provided in exploration:
 // Link: https://canvas.oregonstate.edu/courses/1999732/assignments/9997827?module_item_id=25329384
@@ -14,6 +13,7 @@
 
 
 // -------------------------------------------- Preprocessor Directives and Structs -------------------------------------------- //
+
 
 #include <stdio.h>
 #include <stdbool.h>
@@ -24,7 +24,6 @@
 #include <sys/wait.h>
 #include <signal.h>
 #include <fcntl.h>
-
 
 #define INPUT_LENGTH 2048
 #define MAX_ARGS 512
@@ -55,7 +54,6 @@ void check_background_processes(void);
 void handle_SIGTSTP(int signal);
 void handle_parent_signals(void);
 void handle_child_signals(bool isBackground);
-
 
 int foregroundProcessExitCode = 0;
 int bgProcesses[MAX_BACKGROUND_PROCESSES];
@@ -117,7 +115,7 @@ int main() {
 }
 
 
-// -------------------------------------------- Command chooser -------------------------------------------- //
+// -------------------------------------------- Command Chooser -------------------------------------------- //
 
 
 void command_chooser(struct command_line * currentCommand) {
@@ -343,7 +341,6 @@ void handle_parent_signals(void) {
     sigaction(SIGTSTP, &SIGTSTP_action, NULL);
 }
 
-
 void handle_child_signals(bool isBackground){
     // Children ignore SIGTSTP (Ctrl - Z) so only the shell handles it
     struct sigaction ignore_TSTP = {0};
@@ -362,7 +359,6 @@ void handle_child_signals(bool isBackground){
         sigaction(SIGINT, &default_action, NULL); 
     }
 }
-
 
 void handle_SIGTSTP(int signal) {
     // handle SIGTSTP for parent process
