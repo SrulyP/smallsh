@@ -54,13 +54,13 @@ int  shell_command(struct command_line * currentCommand);
 void check_background_processes(void);
 void handle_SIGTSTP(int signal);
 void handle_parent_signals(void);
-void handle_child_signals(mode);
+void handle_child_signals(bool isBackground);
 
 
 int foregroundProcessExitCode = 0;
 int bgProcesses[MAX_BACKGROUND_PROCESSES];
 int bgProcessesCounter = 0;
-int onlyForeground = 0;
+bool onlyForeground = false;
 
 
 // -------------------------------------------- Parser - Adapted from Provided Code -------------------------------------------- //
@@ -83,12 +83,12 @@ struct command_line * parse_input() {
         } else if (!strcmp(token, ">")) {
             currentCommand -> outputFile = strdup(strtok(NULL, " \n"));
         } else if (!strcmp(token, "&")) {
-            if (onlyForeground == 1) {
-                currentCommand -> isBackground = false;
+            // If only foreground mode is active, ignore the '&' directive to make it a background process
+            if (onlyForeground) {
+                currentCommand->isBackground = false;
             } else {
-                currentCommand -> isBackground = true;
+                currentCommand->isBackground = true;
             }
-            
         } else {
             currentCommand -> argv[currentCommand -> argc++] = strdup(token);
         }
@@ -253,10 +253,10 @@ int shell_command(struct command_line * currentCommand) {
     // Child 
     case 0:
         if (currentCommand->isBackground) {
-            handle_child_signals(1); 
+            handle_child_signals(true);  
             redirect_background(currentCommand);
         } else {
-            handle_child_signals(0); 
+            handle_child_signals(false);  
             redirect_foreground(currentCommand);
         }
 
@@ -344,13 +344,13 @@ void handle_parent_signals(void) {
 }
 
 
-void handle_child_signals(mode){
+void handle_child_signals(bool isBackground){
     // Children ignore SIGTSTP (Ctrl - Z) so only the shell handles it
     struct sigaction ignore_TSTP = {0};
     ignore_TSTP.sa_handler = SIG_IGN;
     sigaction(SIGTSTP, &ignore_TSTP, NULL);
 
-    if (mode == 1) {
+    if (isBackground) {
         // If child is run in background, ignore SIGINT (ctrl - C)
         struct sigaction ignore_SIGINT = {0}; 
         ignore_SIGINT.sa_handler = SIG_IGN;
@@ -366,18 +366,12 @@ void handle_child_signals(mode){
 
 void handle_SIGTSTP(int signal) {
     // handle SIGTSTP for parent process
-    switch (onlyForeground){
-        case 0:
-            printf("Entering foreground-only mode (& is now ignored)\n");
-            fflush(stdout);
-            onlyForeground = 1;
-            break;
-        case 1:
-            printf("Exiting foreground-only mode\n");
-            fflush(stdout);
-            onlyForeground = 0;
-            break;
-        default:
-            break;
+    if (!onlyForeground) {
+        printf("Entering foreground-only mode (& is now ignored)\n");
+        onlyForeground = true;
+    } else {
+        printf("Exiting foreground-only mode\n");
+        onlyForeground = false;
     }
+    fflush(stdout);
 }
