@@ -42,6 +42,8 @@ void redirect_foreground(struct command_line * currentCommand);
 int  shell_command(struct command_line * currentCommand);
 void check_background_processes(void);
 void handle_SIGTSTP(int signal);
+void handle_parent_signals(void);
+void handle_child_signals(mode);
 
 
 int foregroundProcessExitCode = 0;
@@ -89,18 +91,7 @@ struct command_line * parse_input() {
 
 
 int main() {
-
-    // handle SIGINT (ctrl - C) - parent ignores it
-    struct sigaction ignore_SIGINT = {0};
-    ignore_SIGINT.sa_handler = SIG_IGN;
-    sigaction(SIGINT, &ignore_SIGINT, NULL);
-
-    // handle SIGTSTP (ctrl - Z)
-    struct sigaction SIGTSTP_action = {0};
-    SIGTSTP_action.sa_handler = &handle_SIGTSTP;
-    sigfillset(&SIGTSTP_action.sa_mask);
-    SIGTSTP_action.sa_flags = SA_RESTART;
-    sigaction(SIGTSTP, &SIGTSTP_action, NULL);
+    handle_parent_signals();
 
     struct command_line * currentCommand;
     while (true) {
@@ -166,7 +157,7 @@ void check_status(void) {
 }
 
 
-// -------------------------------------------- Redirection of input and output -------------------------------------------- //
+// -------------------------------------------- Redirection of Input and Output -------------------------------------------- //
 
 
 // Redirects the standard input file to match the desired input file
@@ -234,7 +225,7 @@ void redirect_foreground(struct command_line * currentCommand) {
 }
 
 
-// -------------------------------------------- Shell Commands -------------------------------------------- //
+// -------------------------------------------- Shell Commands and Forking -------------------------------------------- //
 
 
 int shell_command(struct command_line * currentCommand) {
@@ -250,22 +241,11 @@ int shell_command(struct command_line * currentCommand) {
 
     // Child 
     case 0:
-        // Children ignore SIGTSTP (Ctrl - Z) so only the shell handles it
-        struct sigaction ignore_TSTP = {0};
-        ignore_TSTP.sa_handler = SIG_IGN;
-        sigaction(SIGTSTP, &ignore_TSTP, NULL);
-
         if (currentCommand->isBackground) {
-            // If child is run in background, ignore SIGINT (ctrl - C)
-            struct sigaction ignore_SIGINT = {0}; 
-            ignore_SIGINT.sa_handler = SIG_IGN;
-            sigaction(SIGINT, &ignore_SIGINT, NULL);
+            handle_child_signals(1); 
             redirect_background(currentCommand);
         } else {
-            // If child is run in foreground, run SIGINT (ctrl - C)
-            struct sigaction default_action = {0};
-            default_action.sa_handler = SIG_DFL;  
-            sigaction(SIGINT, &default_action, NULL); 
+            handle_child_signals(0); 
             redirect_foreground(currentCommand);
         }
 
@@ -302,7 +282,6 @@ int shell_command(struct command_line * currentCommand) {
         }
         break;
     }
-
     return EXIT_SUCCESS;
 }
 
@@ -334,6 +313,45 @@ void check_background_processes(void) {
         }
     }
 }
+
+
+// -------------------------------------------- Signal Handling -------------------------------------------- //
+
+
+void handle_parent_signals(void) {
+    // handle SIGINT (ctrl - C) - parent ignores it
+    struct sigaction ignore_SIGINT = {0};
+    ignore_SIGINT.sa_handler = SIG_IGN;
+    sigaction(SIGINT, &ignore_SIGINT, NULL);
+
+    // handle SIGTSTP (ctrl - Z)
+    struct sigaction SIGTSTP_action = {0};
+    SIGTSTP_action.sa_handler = &handle_SIGTSTP;
+    sigfillset(&SIGTSTP_action.sa_mask);
+    SIGTSTP_action.sa_flags = SA_RESTART;
+    sigaction(SIGTSTP, &SIGTSTP_action, NULL);
+}
+
+
+void handle_child_signals(mode){
+    // Children ignore SIGTSTP (Ctrl - Z) so only the shell handles it
+    struct sigaction ignore_TSTP = {0};
+    ignore_TSTP.sa_handler = SIG_IGN;
+    sigaction(SIGTSTP, &ignore_TSTP, NULL);
+
+    if (mode == 1) {
+        // If child is run in background, ignore SIGINT (ctrl - C)
+        struct sigaction ignore_SIGINT = {0}; 
+        ignore_SIGINT.sa_handler = SIG_IGN;
+        sigaction(SIGINT, &ignore_SIGINT, NULL);
+    } else {
+        // If child is run in foreground, run SIGINT (ctrl - C)
+        struct sigaction default_action = {0};
+        default_action.sa_handler = SIG_DFL;  
+        sigaction(SIGINT, &default_action, NULL); 
+    }
+}
+
 
 void handle_SIGTSTP(int signal) {
     // handle SIGTSTP for parent process
