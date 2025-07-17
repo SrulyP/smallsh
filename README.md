@@ -1,0 +1,1 @@
+Smallsh is a custom UNIX-based shell that supports built-in commands (cd, status, exit), execution of external commands via the environment path and the exec family, foreground/background process management, input/output redirection, and a foreground-only mode toggled by SIGTSTP (Ctrl - Z). It also implements custom signal handling for SIGINT and SIGTSTP to manage process modes.
